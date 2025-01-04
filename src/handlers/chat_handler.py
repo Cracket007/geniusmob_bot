@@ -18,26 +18,18 @@ def handle_message(bot: TeleBot, message: Message):
         
         add_to_chat_history(user_id, "user", user_message)
         
-        # Получаем сохраненный контекст беседы
-        context = chat_contexts.get(user_id, "Контекст отсутствует")
+        context = chat_contexts.get(user_id, "Контекст відсутній")
         
-        # Формируем полную инструкцию с контекстом
         full_instruction = f"""{SYSTEM_INSTRUCTION}
 
-ТЕКУЩИЙ КОНТЕКСТ БЕСЕДЫ:
+ПОТОЧНИЙ КОНТЕКСТ РОЗМОВИ:
 {context}
 
-На основе этого контекста и новых сообщений продолжайте консультацию."""
+На основі цього контексту та нових повідомлень продовжуйте консультацію."""
 
-        # Формируем сообщения для API
         messages = [
             {"role": "system", "content": full_instruction}
-        ] + chat_histories[user_id][-3:]  # Добавляем последние 3 сообщения
-        
-        print("\nОтправляем в OpenAI:")
-        print(f"Контекст беседы: {chat_contexts.get(user_id, 'нет контекста')}")
-        for msg in messages:
-            print(f"{msg['role']}: {msg['content']}\n")
+        ] + chat_histories[user_id][-3:]
         
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -47,24 +39,18 @@ def handle_message(bot: TeleBot, message: Message):
         ai_response = response.choices[0].message.content
         add_to_chat_history(user_id, "assistant", ai_response)
         
-        # Проверяем наличие метки для создания заявки
         if "[[CREATE_REPAIR_REQUEST]]" in ai_response:
-            # Удаляем метку из ответа пользователю
             clean_response = ai_response.replace("[[CREATE_REPAIR_REQUEST]]", "")
-            
-            # Извлекаем информацию о заявке
             repair_info = extract_repair_info(chat_histories[user_id])
             admin_message = format_repair_request(repair_info)
-            
-            # Отправляем заявку админу
             bot.send_message(ADMIN_ID, admin_message)
-            bot.reply_to(message, clean_response)
+            bot.send_message(message.chat.id, clean_response)
         else:
-            bot.reply_to(message, ai_response)
+            bot.send_message(message.chat.id, ai_response)
             
     except Exception as e:
-        print(f"Ошибка: {str(e)}")
-        bot.reply_to(message, "Извините, произошла ошибка. Попробуйте повторить сообщение.")
+        print(f"Помилка: {str(e)}")
+        bot.send_message(message.chat.id, "Вибачте, сталася помилка. Спробуйте повторити повідомлення.")
 
 def extract_repair_info(chat_history):
     try:
@@ -82,7 +68,7 @@ def extract_repair_info(chat_history):
 
 def format_repair_request(repair_info):
     return f"""
-📱 Новая заявка на ремонт!
+📱 Нова заявка на ремонт!
 
 {repair_info}
     """ 
